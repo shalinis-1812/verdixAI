@@ -1,0 +1,58 @@
+{
+  "sourceFile": "VERIDEX_AI_Synthetic_Dataset_1000.xlsx",
+  "rows": 1000,
+  "columns": [
+    "case_id",
+    "document_id",
+    "document_type",
+    "synthetic_name",
+    "synthetic_dob",
+    "synthetic_expiry",
+    "observed_name_ocr",
+    "observed_dob_ocr",
+    "observed_expiry_ocr",
+    "observed_document_number",
+    "ocr_match",
+    "mrz_match",
+    "data_consistency",
+    "tampering_detected",
+    "face_match_percent",
+    "document_integrity_score",
+    "identity_confidence_score",
+    "data_consistency_score",
+    "forensic_confidence_score",
+    "risk_score",
+    "risk_level",
+    "manipulation_type",
+    "primary_evidence",
+    "recommended_action",
+    "processing_time_seconds",
+    "model_mode"
+  ],
+  "riskLevels": {
+    "HIGH": 527,
+    "LOW": 400,
+    "CRITICAL": 73
+  },
+  "manipulationTypes": {
+    "Genuine": 400,
+    "DOB Changed": 100,
+    "Expiry Changed": 100,
+    "Document Number Changed": 100,
+    "MRZ Modified": 100,
+    "Name Changed": 100,
+    "Multiple Manipulations": 50,
+    "Photo Replaced": 50
+  },
+  "documentTypes": {
+    "National ID": 259,
+    "Passport": 253,
+    "PAN Card": 246,
+    "Driving Licence": 242
+  },
+  "model": {
+    "artifactVersion": "veridex-synthetic-logistic-v1",
+    "holdoutAccuracy": 1.0,
+    "holdoutAuc": 1.0
+  }
+}

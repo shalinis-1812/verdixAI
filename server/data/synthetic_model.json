@@ -1,0 +1,87 @@
+{
+  "artifactVersion": "veridex-synthetic-logistic-v1",
+  "trainedFrom": "VERIDEX_AI_Synthetic_Dataset_1000.xlsx / Synthetic Dataset",
+  "trainingRows": 1000,
+  "label": "tampering_detected",
+  "positiveClass": "Yes",
+  "featureNames": [
+    "ocr_match_num",
+    "mrz_match_num",
+    "data_consistency_num",
+    "face_match_percent",
+    "document_integrity_score",
+    "identity_confidence_score",
+    "data_consistency_score",
+    "forensic_confidence_score",
+    "document_type=Driving Licence",
+    "document_type=National ID",
+    "document_type=PAN Card",
+    "document_type=Passport"
+  ],
+  "numericFeatures": [
+    "ocr_match_num",
+    "mrz_match_num",
+    "data_consistency_num",
+    "face_match_percent",
+    "document_integrity_score",
+    "identity_confidence_score",
+    "data_consistency_score",
+    "forensic_confidence_score"
+  ],
+  "documentTypes": [
+    "Driving Licence",
+    "National ID",
+    "PAN Card",
+    "Passport"
+  ],
+  "means": [
+    0.63625,
+    0.61875,
+    0.44875,
+    90.49049999999997,
+    72.165875,
+    86.09612500000004,
+    66.68787499999996,
+    72.78112500000002,
+    0.2475,
+    0.25375,
+    0.2375,
+    0.26125
+  ],
+  "stds": [
+    0.4810778913024385,
+    0.4856937692620715,
+    0.49736650218927997,
+    15.288014414893768,
+    20.344995649652397,
+    17.073871045676043,
+    24.693202819488093,
+    20.544784769726242,
+    0.43155967142447527,
+    0.43515622194793396,
+    0.425551113263729,
+    0.4393158744001835
+  ],
+  "weights": [
+    -0.6017662067766576,
+    -0.563170874754854,
+    -1.633412803680912,
+    -0.9274804200109409,
+    -1.3526102020887059,
+    -0.8184180524398522,
+    -1.527411667496857,
+    -1.3751825535571895,
+    0.07127022941345829,
+    -0.02190640890350632,
+    0.005009706287861806,
+    -0.05316569261908917
+  ],
+  "intercept": 2.189547378984862,
+  "decisionThreshold": 0.5,
+  "holdoutAccuracy": 1.0,
+  "holdoutAuc": 1.0,
+  "classBalance": {
+    "notTampered": 400,
+    "tampered": 600
+  }
+}

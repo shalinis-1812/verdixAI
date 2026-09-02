@@ -5,6 +5,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import {
   createScreeningCase,
+  createUploadedScreeningCase,
   getCaseDetail,
   getDashboardData,
   getReportPayload,
@@ -39,7 +40,7 @@ export const appRouter = router({
       });
     }),
     get: protectedProcedure.input(z.object({ caseId: z.string().min(1) })).query(({ input }) => getCaseDetail(input.caseId)),
-    screen: protectedProcedure.input(z.object({ identityId: z.number().int().positive(), manipulationCodes: z.array(z.string()).default([]) })).mutation(({ input }) => createScreeningCase(input.identityId, input.manipulationCodes)),
+    screen: protectedProcedure.input(z.object({ identityId: z.number().int().positive().optional(), manipulationCodes: z.array(z.string()).default([]), fileName: z.string().optional(), mimeType: z.string().optional(), fileBase64: z.string().optional(), rowIndex: z.number().int().nonnegative().optional() })).mutation(({ input }) => input.fileBase64 && input.fileName ? createUploadedScreeningCase(input.fileName, input.mimeType ?? "", input.fileBase64, input.rowIndex ?? 0) : input.identityId ? createScreeningCase(input.identityId, input.manipulationCodes) : null),
     updateDecision: protectedProcedure.input(z.object({ caseId: z.string().min(1), decision: z.enum(["reviewed", "escalated"]) })).mutation(({ input }) => updateCaseDecision(input.caseId, input.decision)),
     report: protectedProcedure.input(z.object({ caseId: z.string().min(1) })).query(async ({ input }) => {
       const detail = await getCaseDetail(input.caseId);

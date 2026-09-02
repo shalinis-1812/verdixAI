@@ -15,6 +15,7 @@ import { calculateRiskScore,
   type RiskSignalInput,
 } from "../shared/risk";
 import type { CaseDetail, CaseSummary, DashboardData, EngineStatus, EvidenceItem } from "../shared/types";
+import { inferSyntheticRow, modelSummary, parseSyntheticUpload, type UploadedSyntheticRow } from "./inference";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -364,6 +365,63 @@ export async function createScreeningCase(identityId: number, manipulationCodes:
   return getCaseDetail(caseId);
 }
 
+export async function createUploadedScreeningCase(fileName: string, mimeType: string, base64: string, rowIndex = 0) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = parseSyntheticUpload(fileName, mimeType, base64);
+  const row: UploadedSyntheticRow | undefined = rows[rowIndex] ?? rows[0];
+  if (!row) throw new Error("No synthetic rows were found in the uploaded file.");
+  const prediction = inferSyntheticRow(row);
+  const now = new Date();
+  const syntheticId = `SYN-UPLOAD-${String(Date.now()).slice(-8)}`;
+  const documentNumber = String(row.document_id ?? row.observed_document_number ?? syntheticId);
+  const identityValues = {
+    syntheticId,
+    fullName: String(row.synthetic_name ?? row.observed_name_ocr ?? "Synthetic identity"),
+    dateOfBirth: String(row.synthetic_dob ?? row.observed_dob_ocr ?? "Unknown"),
+    nationality: "Indian",
+    documentNumber,
+    documentType: String(row.document_type ?? "Synthetic document"),
+    expiryDate: String(row.synthetic_expiry ?? row.observed_expiry_ocr ?? "Unknown"),
+    faceReference: `FACE-UPLOAD-${String(Date.now()).slice(-6)}`,
+  };
+  await db.insert(syntheticIdentities).values(identityValues);
+  const identity = (await db.select().from(syntheticIdentities).where(eq(syntheticIdentities.syntheticId, syntheticId)).limit(1))[0];
+  if (!identity) return null;
+  await db.insert(syntheticDocuments).values({
+    identityId: identity.id,
+    documentType: identity.documentType,
+    filename: fileName,
+    issueDate: "Dataset row input",
+    expiryDate: identity.expiryDate,
+    extractedText: Object.entries(row).map(([key, value]) => `${key}: ${String(value)}`).join("\n"),
+    metadataJson: { source: "uploaded synthetic dataset", modelVersion: prediction.modelVersion, rowIndex, probability: prediction.probability, holdoutAccuracy: prediction.holdoutAccuracy, holdoutAuc: prediction.holdoutAuc },
+  });
+  const document = (await db.select().from(syntheticDocuments).where(eq(syntheticDocuments.identityId, identity.id)).orderBy(desc(syntheticDocuments.id)).limit(1))[0];
+  if (!document) return null;
+  const caseId = `VRX-UPLOAD-${String(Date.now()).slice(-7)}`;
+  const level = prediction.level;
+  await db.insert(screeningCases).values({
+    caseId,
+    identityId: identity.id,
+    documentId: document.id,
+    score: prediction.score,
+    riskLevel: level,
+    status: level === "LOW" ? "completed" : "needs_review",
+    decision: level === "LOW" ? "Dataset model indicates routine review" : "Held for manual verification",
+    recommendedAction: level === "LOW" ? "Proceed with standard verification checks" : "Manual Verification Required",
+    evidenceJson: prediction.signals,
+    subscoresJson: calculateSubscores(prediction.signals),
+    createdAt: now,
+    updatedAt: now,
+  });
+  const inserted = (await db.select().from(screeningCases).where(eq(screeningCases.caseId, caseId)).limit(1))[0];
+  if (!inserted) return null;
+  await db.insert(riskSignals).values(prediction.signals.map((signal) => ({ screeningCaseId: inserted.id, code: signal.code, label: signal.label, severity: signal.severity, weight: signal.weight, description: signal.description, status: signal.status, evidenceJson: { evidence: signal.evidence ?? "", source: "dataset-inference" } })));
+  await db.insert(screeningEvents).values(eventRows(inserted.id, now));
+  return getCaseDetail(caseId);
+}
+
 export async function updateCaseDecision(caseId: string, decision: "reviewed" | "escalated") {
   const db = await getDb();
   if (!db) return null;
@@ -382,12 +440,13 @@ export function getSimulatorResult(activeCodes: string[]) {
 }
 
 export function getSystemStatus(): EngineStatus[] {
+  const model = modelSummary();
   return [
     { name: "OCR", state: "Operational", mode: "DEMO / FALLBACK MODE", detail: "Synthetic text extraction profile available", latency: "0.84 s" },
     { name: "MRZ Analysis", state: "Operational", mode: "DEMO / FALLBACK MODE", detail: "Checksum and field alignment checks available", latency: "0.62 s" },
     { name: "Forensic Review", state: "Operational", mode: "DEMO / FALLBACK MODE", detail: "Synthetic artifact rules available", latency: "1.16 s" },
     { name: "Face Verification", state: "Standby", mode: "DEMO / FALLBACK MODE", detail: "Uses synthetic face references only", latency: "0.79 s" },
-    { name: "Risk Fusion", state: "Operational", mode: "REAL MODEL", detail: "Configured weighted scoring engine", latency: "0.37 s" },
+    { name: "Risk Fusion", state: "Operational", mode: "REAL MODEL", detail: `${model.artifactVersion} · ${model.trainingRows} rows · holdout AUC ${(model.holdoutAuc * 100).toFixed(0)}%`, latency: "0.37 s" },
     { name: "Database", state: "Operational", mode: "REAL MODEL", detail: "Persistent synthetic dataset store", latency: "0.09 s" },
   ];
 }
