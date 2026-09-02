@@ -1,42 +1,43 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import PortalShell from "./components/PortalShell";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import NewScreening from "./pages/NewScreening";
+import ScreeningHistory from "./pages/ScreeningHistory";
+import CaseDetail from "./pages/CaseDetail";
+import Forensics from "./pages/Forensics";
+import IdentityGraph from "./pages/IdentityGraph";
+import RiskSimulator from "./pages/RiskSimulator";
+import Reports from "./pages/Reports";
+import SystemStatus from "./pages/SystemStatus";
+import NotFound from "./pages/NotFound";
+import { Route, Switch } from "wouter";
 
-function Router() {
-  // make sure to consider if you need authentication for certain routes
-  return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
-    </Switch>
-  );
+function WorkspaceRoutes() {
+  return <Switch>
+    <Route path="/" component={Home} />
+    <Route path="/screening/new" component={NewScreening} />
+    <Route path="/history" component={ScreeningHistory} />
+    <Route path="/case/:caseId" component={CaseDetail} />
+    <Route path="/forensics" component={Forensics} />
+    <Route path="/identity-graph" component={IdentityGraph} />
+    <Route path="/simulator" component={RiskSimulator} />
+    <Route path="/reports" component={Reports} />
+    <Route path="/system" component={SystemStatus} />
+    <Route path="/404" component={NotFound} />
+    <Route component={NotFound} />
+  </Switch>;
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
-function App() {
-  return (
-    <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
-      </ThemeProvider>
-    </ErrorBoundary>
-  );
+export default function App() {
+  return <ErrorBoundary>
+    <ThemeProvider defaultTheme="light">
+      <TooltipProvider>
+        <Toaster />
+        <PortalShell><WorkspaceRoutes /></PortalShell>
+      </TooltipProvider>
+    </ThemeProvider>
+  </ErrorBoundary>;
 }
-
-export default App;
