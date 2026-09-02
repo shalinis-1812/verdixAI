@@ -33,7 +33,15 @@ export type CaseDetail = CaseSummary & {
     issueDate: string;
     expiryDate: string;
     extractedText: string;
-    metadata: Record<string, string>;
+    metadata: Record<string, unknown>;
+  };
+  analysis: {
+    source: "synthetic" | "dataset-inference" | "vision-inference";
+    extractionConfidence?: number;
+    modelVersion?: string;
+    holdoutAuc?: number;
+    uncertainty: string;
+    tamperCues: string[];
   };
   identity: {
     fullName: string;

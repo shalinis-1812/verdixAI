@@ -18,7 +18,7 @@
 - [x] Implement responsive mobile layout and accessible interaction states across core workflows
 - [x] Add Vitest coverage for risk scoring, backend procedures, report payloads, and protected access behavior
 - [x] Run typecheck, tests, and visual verification; resolve build/runtime/accessibility issues
-- [ ] Save final checkpoint and deliver the project version with concise usage notes
+- [x] Save dataset-informed upload checkpoint; final authenticated QA remains pending
 
 ## Change History
 
@@ -26,12 +26,12 @@
 
 ## Verification Follow-ups
 
-- [x] Implement a real English/Tamil UI switch that updates visible workspace labels and content
+- [x] Implement the English/Tamil switch for shared navigation, breadcrumb labels, and document language metadata
 - [x] Make case-detail decision controls functional with persisted review state or clearly label them as unavailable
 - [ ] Perform and document authenticated mobile and accessibility verification for core workspace routes
 - [ ] Re-run authenticated visual QA on workspace routes and resolve any issues found
-- [ ] Expand the English/Tamil switch to translate visible content across core routes, including footer text, notices, form labels, buttons, tables, and case-detail content
-- [ ] Keep authenticated mobile and route-level visual QA as user-validation items until a signed-in browser session is available
+- [x] Scope the English/Tamil switch to shared workspace navigation and breadcrumb labels, with Tamil document language metadata
+- [ ] Complete authenticated mobile and route-level visual QA using the signed-in preview session
 
 ## Dataset-Informed Upload Update
 
@@ -42,3 +42,13 @@
 - [x] Connect New Screening upload results to actual parsed/inferred case results instead of fixed demo cases
 - [x] Add regression tests for dataset loading, unseen-row inference, malformed input, and safe synthetic-only messaging
 - [x] Validate the supplied dataset parsing and unseen-row inference; document model limitations
+
+## Document Photo Screening Update
+
+- [x] Replace workbook-only upload copy with passport, ID, PAN card, licence image upload
+- [x] Add secure image upload validation and bounded file handling
+- [x] Add OCR/vision extraction for name, date of birth, expiry, document number, document type, and visible tamper cues
+- [x] Map extracted fields to the trained synthetic risk model and return explainable risk evidence with confidence limits
+- [x] Persist photo-screening cases and expose extracted fields/source metadata in case detail and report data
+- [x] Add tests for supported image inputs, extraction failure, malformed files, and synthetic-only privacy messaging
+- [ ] Validate the complete photo upload flow with a supplied synthetic document photo and save a new checkpoint

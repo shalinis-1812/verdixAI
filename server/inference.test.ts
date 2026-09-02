@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import * as XLSX from "xlsx";
 import { inferSyntheticRow, modelSummary, parseSyntheticUpload } from "./inference";
+import { extractDocumentFromImage, parseDocumentExtraction } from "./documentVision";
 
 const genuineRow = {
   document_type: "Passport", ocr_match: "Yes", mrz_match: "Yes", data_consistency: "Yes",
@@ -31,6 +32,22 @@ describe("dataset-backed unseen inference", () => {
 
   it("rejects rows missing required model features", () => {
     expect(() => inferSyntheticRow({ document_type: "Passport" })).toThrow(/Missing required synthetic fields/);
+  });
+
+  it("rejects unsupported photo formats before vision processing", async () => {
+    await expect(extractDocumentFromImage("document.pdf", "application/pdf", "ZmFrZQ==")).rejects.toThrow(/JPG, PNG, or WEBP/);
+  });
+
+  it("rejects empty or malformed photo extraction payloads safely", async () => {
+    await expect(extractDocumentFromImage("document.jpg", "image/jpeg", "")).rejects.toThrow(/empty or larger/);
+    expect(() => parseDocumentExtraction("not-json")).toThrow();
+  });
+
+  it("normalizes a successful structured vision extraction", () => {
+    const parsed = parseDocumentExtraction(JSON.stringify({ documentType: "Passport", fullName: "SYNTHETIC PERSON", dateOfBirth: "01-01-1990", expiryDate: "01-01-2030", documentNumber: "SYN-1", nationality: "Indian", ocrConfidence: 87, mrzPresent: true, mrzConsistent: false, fieldsConsistent: false, tamperCues: ["possible edit"], extractionNotes: "Review manually" }));
+    expect(parsed.documentType).toBe("Passport");
+    expect(parsed.ocrConfidence).toBe(87);
+    expect(parsed.tamperCues).toContain("possible edit");
   });
 
   it("parses the supplied durable workbook and produces a model-backed result", () => {

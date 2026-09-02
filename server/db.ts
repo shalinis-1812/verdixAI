@@ -16,6 +16,8 @@ import { calculateRiskScore,
 } from "../shared/risk";
 import type { CaseDetail, CaseSummary, DashboardData, EngineStatus, EvidenceItem } from "../shared/types";
 import { inferSyntheticRow, modelSummary, parseSyntheticUpload, type UploadedSyntheticRow } from "./inference";
+import { extractDocumentFromImage } from "./documentVision";
+import { storagePut } from "./storage";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -272,6 +274,8 @@ export async function getCaseDetail(caseId: string): Promise<CaseDetail | null> 
     recommendedAction: row.caseRow.recommendedAction,
     createdAt: row.caseRow.createdAt,
   });
+  const metadata = (row.document.metadataJson as Record<string, unknown>) ?? {};
+  const source = metadata.source === "vision extraction" ? "vision-inference" : metadata.source === "uploaded synthetic dataset" ? "dataset-inference" : "synthetic";
   return {
     ...summary,
     document: {
@@ -279,7 +283,15 @@ export async function getCaseDetail(caseId: string): Promise<CaseDetail | null> 
       issueDate: row.document.issueDate,
       expiryDate: row.document.expiryDate,
       extractedText: row.document.extractedText,
-      metadata: (row.document.metadataJson as Record<string, string>) ?? {},
+      metadata,
+    },
+    analysis: {
+      source,
+      extractionConfidence: typeof metadata.extractionConfidence === "number" ? metadata.extractionConfidence : undefined,
+      modelVersion: typeof metadata.modelVersion === "string" ? metadata.modelVersion : undefined,
+      holdoutAuc: typeof metadata.holdoutAuc === "number" ? metadata.holdoutAuc : undefined,
+      uncertainty: source === "vision-inference" ? "Vision extraction can be affected by blur, glare, cropping, unfamiliar layouts, and visible security features. This is not proof of authenticity." : "Synthetic demonstration result; it is not calibrated for real-world identity verification.",
+      tamperCues: Array.isArray(metadata.tamperCues) ? metadata.tamperCues.map(String) : [],
     },
     identity: {
       fullName: row.identity.fullName,
@@ -422,6 +434,47 @@ export async function createUploadedScreeningCase(fileName: string, mimeType: st
   return getCaseDetail(caseId);
 }
 
+export async function createPhotoScreeningCase(fileName: string, mimeType: string, base64: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const extracted = await extractDocumentFromImage(fileName, mimeType, base64);
+  const visionRow: UploadedSyntheticRow = {
+    document_type: extracted.documentType,
+    synthetic_name: extracted.fullName,
+    observed_name_ocr: extracted.fullName,
+    synthetic_dob: extracted.dateOfBirth,
+    observed_dob_ocr: extracted.dateOfBirth,
+    synthetic_expiry: extracted.expiryDate,
+    observed_expiry_ocr: extracted.expiryDate,
+    observed_document_number: extracted.documentNumber,
+    ocr_match: extracted.ocrConfidence >= 70 ? "Yes" : "No",
+    mrz_match: !extracted.mrzPresent || extracted.mrzConsistent ? "Yes" : "No",
+    data_consistency: extracted.fieldsConsistent ? "Yes" : "No",
+    face_match_percent: extracted.tamperCues.some((cue) => cue.toLowerCase().includes("photo")) ? 72 : 96,
+    document_integrity_score: extracted.tamperCues.length ? 38 : Math.max(72, extracted.ocrConfidence),
+    identity_confidence_score: extracted.ocrConfidence,
+    data_consistency_score: extracted.fieldsConsistent ? 88 : 36,
+    forensic_confidence_score: extracted.tamperCues.length ? 34 : 82,
+  };
+  const prediction = inferSyntheticRow(visionRow);
+  const stored = await storagePut(`screening-uploads/${Date.now()}-${fileName}`, Buffer.from(base64, "base64"), mimeType);
+  const now = new Date();
+  const syntheticId = `SYN-PHOTO-${String(Date.now()).slice(-8)}`;
+  await db.insert(syntheticIdentities).values({ syntheticId, fullName: extracted.fullName, dateOfBirth: extracted.dateOfBirth, nationality: extracted.nationality, documentNumber: extracted.documentNumber, documentType: extracted.documentType, expiryDate: extracted.expiryDate, faceReference: `PHOTO-VISION-${String(Date.now()).slice(-6)}` });
+  const identity = (await db.select().from(syntheticIdentities).where(eq(syntheticIdentities.syntheticId, syntheticId)).limit(1))[0];
+  if (!identity) return null;
+  await db.insert(syntheticDocuments).values({ identityId: identity.id, documentType: extracted.documentType, filename: fileName, issueDate: "Photo extraction", expiryDate: extracted.expiryDate, extractedText: JSON.stringify(extracted), metadataJson: { source: "vision extraction", storageKey: stored.key, storageUrl: stored.url, modelVersion: prediction.modelVersion, extractionConfidence: extracted.ocrConfidence, tamperCues: extracted.tamperCues } });
+  const document = (await db.select().from(syntheticDocuments).where(eq(syntheticDocuments.identityId, identity.id)).orderBy(desc(syntheticDocuments.id)).limit(1))[0];
+  if (!document) return null;
+  const caseId = `VRX-PHOTO-${String(Date.now()).slice(-7)}`;
+  await db.insert(screeningCases).values({ caseId, identityId: identity.id, documentId: document.id, score: prediction.score, riskLevel: prediction.level, status: prediction.level === "LOW" ? "completed" : "needs_review", decision: prediction.level === "LOW" ? "Vision extraction indicates routine review" : "Held for manual verification", recommendedAction: prediction.level === "LOW" ? "Proceed with standard verification checks" : "Manual Verification Required", evidenceJson: prediction.signals, subscoresJson: calculateSubscores(prediction.signals), createdAt: now, updatedAt: now });
+  const inserted = (await db.select().from(screeningCases).where(eq(screeningCases.caseId, caseId)).limit(1))[0];
+  if (!inserted) return null;
+  await db.insert(riskSignals).values(prediction.signals.map((signal) => ({ screeningCaseId: inserted.id, code: signal.code, label: signal.label, severity: signal.severity, weight: signal.weight, description: signal.description, status: signal.status, evidenceJson: { evidence: signal.evidence ?? "", source: "vision-inference" } })));
+  await db.insert(screeningEvents).values(eventRows(inserted.id, now));
+  return getCaseDetail(caseId);
+}
+
 export async function updateCaseDecision(caseId: string, decision: "reviewed" | "escalated") {
   const db = await getDb();
   if (!db) return null;
@@ -460,6 +513,7 @@ export function getReportPayload(detail: CaseDetail) {
     case: { caseId: detail.caseId, syntheticId: detail.syntheticId, documentType: detail.documentType, score: detail.score, riskLevel: detail.riskLevel, recommendedAction: detail.recommendedAction, decision: detail.decision },
     identity: detail.identity,
     document: detail.document,
+    analysis: detail.analysis,
     evidence: detail.evidence,
     subscores: detail.subscores,
     timeline: detail.events,
