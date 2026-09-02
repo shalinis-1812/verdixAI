@@ -52,3 +52,10 @@
 - [x] Persist photo-screening cases and expose extracted fields/source metadata in case detail and report data
 - [x] Add tests for supported image inputs, extraction failure, malformed files, and synthetic-only privacy messaging
 - [ ] Validate the complete photo upload flow with a supplied synthetic document photo and save a new checkpoint
+
+## GitHub Synchronization
+
+- [ ] Inspect local Git status, current branch, remotes, and GitHub authentication
+- [ ] Configure the provided repository as the push target without exposing secrets
+- [ ] Push the current VERIDEX AI project to the target repository
+- [ ] Verify the pushed branch and commit on GitHub
