@@ -30,6 +30,16 @@ export default function PortalShell({ children }: { children: React.ReactNode })
   const [largeText, setLargeText] = useState(() => localStorage.getItem("veridex-text") === "large");
   const [tamil, setTamil] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  const handleLogin = () => {
+    setLoginError(null);
+    if (!startLogin()) {
+      setLoginError(
+        "Secure access is not configured for this deployment. Set VITE_APP_ID and VITE_OAUTH_PORTAL_URL, then reload the app."
+      );
+    }
+  };
 
   useEffect(() => {
     document.documentElement.classList.toggle("contrast-mode", contrast);
@@ -54,7 +64,8 @@ export default function PortalShell({ children }: { children: React.ReactNode })
           <h2 id="login-title">Sign in to the screening workspace</h2>
           <p className="muted">Use secure Manus access to review synthetic identity and document screening cases.</p>
           <div className="notice notice-info"><strong>Research / Demonstration Prototype — Synthetic Data Only</strong><span>Do not submit real identity documents or biometric data.</span></div>
-          <button className="button button-primary button-wide" onClick={() => startLogin()}>Continue with secure access</button>
+          {loginError && <div className="notice notice-danger" role="alert" style={{ marginTop: 14 }}><strong>Secure access is unavailable</strong><span>{loginError}</span></div>}
+          <button className="button button-primary button-wide" onClick={handleLogin}>Continue with secure access</button>
           <p className="login-note">Access is protected by Manus OAuth. No passwords are stored in this prototype.</p>
         </div>
         <p className="login-disclaimer">VERIDEX AI — Demonstration Prototype. Not an official Government of India website.</p>
